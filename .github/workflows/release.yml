@@ -55,8 +55,9 @@ jobs:
       
       - name: Run Tests
         run: |
-          export PYTHONPATH=$PWD:$PYTHONPATH
-          pytest tests/ -v --cov=lnmp --cov-report=term-missing
+          mkdir test_run
+          cd test_run
+          pytest ../tests/ -v --cov=lnmp --cov-report=term-missing
 
   # ============================================
   # Job 2: Build Wheels

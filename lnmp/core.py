@@ -1,7 +1,7 @@
 """Core LNMP parsing and encoding functionality."""
 
 from typing import Union
-import lnmp_py_core
+from . import lnmp_py_core
 
 class Record:
     """High-level wrapper for LNMP records."""

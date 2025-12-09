@@ -1,7 +1,7 @@
 """LNMP network routing and context scoring."""
 
 from typing import Dict
-import lnmp_py_core
+from . import lnmp_py_core
 from .envelope import Envelope
 
 

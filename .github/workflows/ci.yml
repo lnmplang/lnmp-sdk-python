@@ -93,8 +93,11 @@ jobs:
       
       - name: Run Python Tests
         run: |
-          export PYTHONPATH=$PWD:$PYTHONPATH
-          pytest tests/ -v --cov=lnmp --cov-report=xml
+          mkdir test_run
+          cd test_run
+          pytest ../tests/ -v --cov=lnmp --cov-report=xml
+          cd ..
+          mv test_run/coverage.xml .
       
       - name: Upload Coverage
         if: matrix.python-version == '3.11'

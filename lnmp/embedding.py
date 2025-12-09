@@ -1,6 +1,6 @@
 """LNMP embedding vector operations."""
 
-import lnmp_py_core
+from . import lnmp_py_core
 from typing import List, Tuple
 
 

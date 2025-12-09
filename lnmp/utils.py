@@ -1,6 +1,6 @@
 """LNMP utility functions (quant, sanitize, debug, etc.)."""
 
-import lnmp_py_core
+from . import lnmp_py_core
 
 
 def quantize(vector: list[float], scheme: str = "QInt8") -> bytes:

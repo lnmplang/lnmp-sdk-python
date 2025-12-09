@@ -4,7 +4,7 @@ This module provides helpers to map LNMP Envelopes to and from transport-specifi
 metadata formats (e.g., HTTP headers).
 """
 
-import lnmp_py_core
+from . import lnmp_py_core
 from typing import Dict, Optional
 from .envelope import Envelope
 

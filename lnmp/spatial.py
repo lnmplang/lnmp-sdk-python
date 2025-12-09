@@ -1,6 +1,6 @@
 """LNMP spatial data encoding and streaming."""
 
-import lnmp_py_core
+from . import lnmp_py_core
 from typing import Tuple
 
 

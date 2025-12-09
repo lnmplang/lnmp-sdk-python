@@ -2,7 +2,7 @@
 
 from typing import Optional
 from datetime import datetime
-import lnmp_py_core
+from . import lnmp_py_core
 from .core import Record
 
 
