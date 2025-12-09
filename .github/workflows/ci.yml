@@ -87,7 +87,9 @@ jobs:
           pip install maturin pytest pytest-cov
       
       - name: Build Extension
-        run: maturin develop --release
+        run: |
+          maturin build --release
+          pip install dist/*.whl --force-reinstall
       
       - name: Run Python Tests
         run: |
@@ -211,13 +213,14 @@ jobs:
       - name: Install Dependencies
         run: |
           pip install maturin
-          maturin develop --release
+          maturin build --release
+          pip install dist/*.whl --force-reinstall
       
       - name: Run Benchmarks
         run: python benchmarks/run_benchmarks.py
       
       - name: Upload Benchmark Results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: benchmarks
           path: BENCHMARKS.md

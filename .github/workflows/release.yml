@@ -53,7 +53,9 @@ jobs:
           pip install maturin pytest pytest-cov
       
       - name: Build Extension
-        run: maturin develop
+        run: |
+          maturin build --release
+          pip install dist/*.whl --force-reinstall
       
       - name: Run Tests
         run: |
