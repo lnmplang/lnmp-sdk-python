@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.21", features = ["extension-module"] }
-lnmp = { workspace = true }
+lnmp = "0.5.7"
 http = "1.0"
 
 [build-dependencies]

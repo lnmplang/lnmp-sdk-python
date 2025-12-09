@@ -189,18 +189,47 @@ See the `examples/` directory for more:
 
 ```bash
 # Clone repository
-git clone https://github.com/lnmplang/lnmp-protocol
-cd lnmp-protocol/sdk/python
+git clone https://github.com/lnmplang/lnmp-sdk-python
+cd lnmp-sdk-python
 
-# Install maturin
-pip install maturin
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install maturin and dev dependencies
+pip install maturin pytest pytest-cov
 
 # Build and install
 maturin develop
 
 # Run tests
-pytest tests/
+export PYTHONPATH=$PWD:$PYTHONPATH
+pytest tests/ -v
 ```
+
+### Release Process
+
+Releases are automated via GitHub Actions:
+
+```bash
+# 1. Update version in pyproject.toml and Cargo.toml
+# 2. Commit and push changes
+git add pyproject.toml Cargo.toml
+git commit -m "chore: bump version to 0.5.8"
+git push origin main
+
+# 3. Create and push version tag
+git tag v0.5.8
+git push origin v0.5.8
+
+# GitHub Actions will automatically:
+# - Run tests on all platforms
+# - Build wheels for Linux, macOS, Windows
+# - Publish to PyPI
+# - Create GitHub Release
+```
+
+See [.github/WORKFLOW.md](.github/WORKFLOW.md) for detailed workflow documentation.
 
 ## 📖 Documentation
 

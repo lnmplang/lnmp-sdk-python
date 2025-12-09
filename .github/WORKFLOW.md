@@ -2,16 +2,16 @@
 
 ## Overview
 
-The Python SDK has its own self-contained CI/CD workflow located in `sdk/python/.github/workflows/`. This allows the SDK to be managed independently and potentially moved to its own repository in the future.
+The LNMP Python SDK has two main GitHub Actions workflows for continuous integration and release automation.
 
 ## Workflow Structure
 
-### 1. **ci.yml** - Main CI/CD Pipeline
+### 1. **ci.yml** - Continuous Integration
 
 **Triggers:**
-- Push to `main` or `develop` branches (when SDK files change)
-- Pull requests to `main` (when SDK files change)
-- Release events
+- Push to `main` or `develop` branches
+- Pull requests to `main`
+- Manual workflow dispatch
 
 **Jobs:**
 
@@ -25,16 +25,16 @@ The Python SDK has its own self-contained CI/CD workflow located in `sdk/python/
 - Runs pytest with coverage reporting
 - Uploads coverage to Codecov
 
-#### Build Wheels
-- Only runs on release events
+#### Build Wheels (Manual Only)
+- Triggered via `workflow_dispatch`
 - Builds native wheels for:
-  - Linux (x86_64, aarch64)
+  - Linux (x86_64)
   - macOS (x86_64, arm64)
   - Windows (x86_64)
 - Uploads wheels as artifacts
 
-#### Publish to PyPI
-- Only runs for non-prerelease releases
+#### Publish to PyPI (Manual Only)
+- Triggered via `workflow_dispatch`
 - Downloads all platform wheels
 - Publishes to PyPI using trusted publisher (OIDC)
 
@@ -43,45 +43,107 @@ The Python SDK has its own self-contained CI/CD workflow located in `sdk/python/
 - Executes performance benchmarks
 - Uploads results as artifacts
 
-## Path Filtering
+---
 
-All jobs use path filtering to only run when SDK-specific files change:
-```yaml
-paths:
-  - 'sdk/python/**'
-  - '.github/workflows/python-ci.yml'
-```
+### 2. **release.yml** - Automated Releases
 
-## Independence from Main Repo
+**Triggers:**
+- Push tags matching `v*` (e.g., `v0.5.7`)
 
-This structure allows the SDK to:
-1. Have its own release cycle
-2. Be tested independently
-3. Maintain separate versioning
-4. Eventually move to its own repository with minimal changes
+**Jobs:**
 
-## Future Migration
+#### Test
+- Matrix testing across Python 3.9-3.12 and all platforms
+- Ensures quality before release
 
-To move the SDK to a separate repository:
-1. Copy `sdk/python/` to new repo root
-2. Update path filters in workflow (remove `sdk/python/` prefix)
-3. Update checkout paths
-4. Set up PyPI trusted publisher for new repo
-5. Update documentation links
+#### Build Wheels
+- Builds wheels for all supported platforms:
+  - Linux x86_64
+  - macOS universal2 (x86_64 + arm64)
+  - Windows x86_64
+- Uploads as artifacts
+
+#### Build Source Distribution
+- Creates source distribution (sdist)
+- Uploads as artifact
+
+#### Publish to PyPI
+- Downloads all wheels and sdist
+- Publishes to PyPI using trusted publisher
+- Only runs for version tags (not pre-releases)
+
+#### Create GitHub Release
+- Creates GitHub release with changelog
+- Attaches all wheels and sdist
+- Marks pre-releases appropriately
 
 ## Environment Variables
 
-The workflow uses:
+Both workflows use:
 - `CARGO_TERM_COLOR=always` - Colored Cargo output
 - `RUST_BACKTRACE=1` - Full backtraces on errors
+- `PYTHONPATH=$PWD:$PYTHONPATH` - For local package imports
 
-## Secrets Required
+## PyPI Publishing Setup
 
-For PyPI publishing, configure:
-- **Trusted Publisher (Recommended)**: Configure at https://pypi.org/manage/account/publishing/
-  - Owner: `lnmplang`
-  - Repository: `lnmp-protocol` (or new SDK repo name)
-  - Workflow: `ci.yml`
-  - Environment: `pypi`
+### Trusted Publisher (Recommended) ✅
+
+Configure at https://pypi.org/manage/account/publishing/
+
+**Settings:**
+- **Owner**: Your GitHub username or organization
+- **Repository**: `lnmp-sdk-python`
+- **Workflow**: `release.yml`
+- **Environment**: `pypi`
 
 No manual tokens required with trusted publishers!
+
+### Alternative: Manual Token
+
+If trusted publisher isn't available:
+1. Generate PyPI API token at https://pypi.org/manage/account/token/
+2. Add as GitHub secret: `PYPI_TOKEN`
+3. Update workflow to use token-based authentication
+
+## Release Process
+
+### Creating a Release
+
+```bash
+# 1. Update version in pyproject.toml and Cargo.toml
+# 2. Commit changes
+git add pyproject.toml Cargo.toml
+git commit -m "chore: bump version to 0.5.7"
+
+# 3. Create and push tag
+git tag v0.5.7
+git push origin main
+git push origin v0.5.7
+
+# 4. GitHub Actions automatically:
+#    - Runs tests
+#    - Builds wheels for all platforms
+#    - Publishes to PyPI
+#    - Creates GitHub Release
+```
+
+### Pre-release
+
+```bash
+# Use pre-release tag format
+git tag v0.5.7-beta.1
+git push origin v0.5.7-beta.1
+
+# Workflow will create GitHub release but skip PyPI
+```
+
+## Required GitHub Secrets
+
+- None required if using PyPI trusted publisher
+- `PYPI_TOKEN` - Only if using manual token authentication
+
+## Permissions
+
+Workflows require:
+- `contents: write` - For creating GitHub releases
+- `id-token: write` - For PyPI trusted publishing

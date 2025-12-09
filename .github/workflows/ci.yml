@@ -3,15 +3,9 @@ name: Python SDK CI/CD
 on:
   push:
     branches: [ main, develop ]
-    paths:
-      - 'sdk/python/**'
-      - '.github/workflows/python-ci.yml'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'sdk/python/**'
-  release:
-    types: [published]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -24,9 +18,6 @@ jobs:
   quality:
     name: Code Quality (Rust)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: sdk/python
     
     steps:
       - uses: actions/checkout@v4
@@ -44,8 +35,8 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            sdk/python/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('sdk/python/Cargo.lock') }}
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
       
       - name: Run rustfmt
         run: cargo fmt --all -- --check
@@ -68,10 +59,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ['3.9', '3.10', '3.11', '3.12']
-    
-    defaults:
-      run:
-        working-directory: sdk/python
     
     steps:
       - uses: actions/checkout@v4
@@ -104,13 +91,15 @@ jobs:
         run: maturin develop --release
       
       - name: Run Python Tests
-        run: pytest tests/ -v --cov=lnmp --cov-report=xml
+        run: |
+          export PYTHONPATH=$PWD:$PYTHONPATH
+          pytest tests/ -v --cov=lnmp --cov-report=xml
       
       - name: Upload Coverage
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
         uses: codecov/codecov-action@v3
         with:
-          file: ./sdk/python/coverage.xml
+          file: ./coverage.xml
           flags: python-sdk
 
   # ============================================
@@ -120,7 +109,7 @@ jobs:
     name: Build Wheels (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
     needs: test
-    if: github.event_name == 'release'
+    if: github.event_name == 'workflow_dispatch'
     strategy:
       matrix:
         include:
@@ -144,11 +133,6 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             name: windows-x86_64
-    
-    defaults:
-      run:
-        working-directory: sdk/python
-    
     steps:
       - uses: actions/checkout@v4
       
@@ -172,7 +156,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: wheels-${{ matrix.name }}
-          path: sdk/python/dist/*.whl
+          path: dist/*.whl
 
   # ============================================
   # Job 4: Publish to PyPI
@@ -181,7 +165,7 @@ jobs:
     name: Publish to PyPI
     runs-on: ubuntu-latest
     needs: build
-    if: github.event_name == 'release' && !github.event.release.prerelease
+    if: github.event_name == 'workflow_dispatch'
     environment:
       name: pypi
       url: https://pypi.org/p/lnmp
@@ -213,9 +197,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: quality
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    defaults:
-      run:
-        working-directory: sdk/python
     
     steps:
       - uses: actions/checkout@v4
@@ -240,4 +221,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: benchmarks
-          path: sdk/python/BENCHMARKS.md
+          path: BENCHMARKS.md

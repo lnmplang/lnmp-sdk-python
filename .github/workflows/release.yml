@@ -1,0 +1,230 @@
+name: Release to PyPI
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v0.5.7
+
+permissions:
+  contents: write  # For creating GitHub releases
+  id-token: write  # For PyPI trusted publishing
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ============================================
+  # Job 1: Run Tests
+  # ============================================
+  test:
+    name: Test Python ${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+      
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install maturin pytest pytest-cov
+      
+      - name: Build Extension
+        run: maturin develop
+      
+      - name: Run Tests
+        run: |
+          export PYTHONPATH=$PWD:$PYTHONPATH
+          pytest tests/ -v --cov=lnmp --cov-report=term-missing
+
+  # ============================================
+  # Job 2: Build Wheels
+  # ============================================
+  build-wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    needs: test
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install Maturin
+        run: pip install maturin
+      
+      - name: Build wheels (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          # Build for x86_64
+          maturin build --release --target x86_64-unknown-linux-gnu --out dist
+          # Build for aarch64 (requires cross-compilation setup)
+          # maturin build --release --target aarch64-unknown-linux-gnu --out dist
+      
+      - name: Build wheels (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          # Build universal2 wheel (x86_64 + arm64)
+          maturin build --release --target universal2-apple-darwin --out dist
+      
+      - name: Build wheels (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          maturin build --release --target x86_64-pc-windows-msvc --out dist
+      
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: dist/*.whl
+
+  # ============================================
+  # Job 3: Build Source Distribution
+  # ============================================
+  build-sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install Maturin
+        run: pip install maturin
+      
+      - name: Build sdist
+        run: maturin sdist --out dist
+      
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  # ============================================
+  # Job 4: Publish to PyPI
+  # ============================================
+  publish-pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [build-wheels, build-sdist]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: pypi
+      url: https://pypi.org/p/lnmp
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-artifacts
+      
+      - name: Prepare distribution directory
+        run: |
+          mkdir -p dist
+          find dist-artifacts -name '*.whl' -exec cp {} dist/ \;
+          find dist-artifacts -name '*.tar.gz' -exec cp {} dist/ \;
+          ls -lh dist/
+      
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
+          verbose: true
+
+  # ============================================
+  # Job 5: Create GitHub Release
+  # ============================================
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-wheels, build-sdist]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-artifacts
+      
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find dist-artifacts -name '*.whl' -exec cp {} release-assets/ \;
+          find dist-artifacts -name '*.tar.gz' -exec cp {} release-assets/ \;
+          ls -lh release-assets/
+      
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.version.outputs.VERSION }}
+          body: |
+            ## LNMP Python SDK ${{ steps.version.outputs.VERSION }}
+            
+            ### Installation
+            
+            ```bash
+            pip install lnmp==${{ steps.version.outputs.VERSION }}
+            ```
+            
+            ### What's Changed
+            
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+            
+            ### Wheels
+            
+            Pre-built wheels are available for:
+            - Linux (x86_64)
+            - macOS (universal2: x86_64 + arm64)
+            - Windows (x86_64)
+            - Python 3.9, 3.10, 3.11, 3.12
+          files: release-assets/*
+          draft: false
+          prerelease: ${{ contains(github.ref, '-') }}
