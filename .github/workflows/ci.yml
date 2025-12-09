@@ -152,7 +152,7 @@ jobs:
         run: maturin build --release --target ${{ matrix.target }} --out dist
       
       - name: Upload Wheels
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.name }}
           path: dist/*.whl
@@ -173,7 +173,7 @@ jobs:
     
     steps:
       - name: Download All Wheels
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: dist
       
