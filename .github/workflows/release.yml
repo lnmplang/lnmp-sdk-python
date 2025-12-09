@@ -18,12 +18,11 @@ jobs:
   # Job 1: Run Tests
   # ============================================
   test:
-    name: Test Python ${{ matrix.python-version }} on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Test Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ['3.9', '3.10', '3.11', '3.12']
     
     steps:
@@ -65,12 +64,9 @@ jobs:
   # Job 2: Build Wheels
   # ============================================
   build-wheels:
-    name: Build wheels on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Build wheels
+    runs-on: ubuntu-latest
     needs: test
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
     
     steps:
       - uses: actions/checkout@v4
@@ -86,29 +82,13 @@ jobs:
       - name: Install Maturin
         run: pip install maturin
       
-      - name: Build wheels (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          # Build for x86_64
-          maturin build --release --target x86_64-unknown-linux-gnu --out dist
-          # Build for aarch64 (requires cross-compilation setup)
-          # maturin build --release --target aarch64-unknown-linux-gnu --out dist
-      
-      - name: Build wheels (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          # Build universal2 wheel (x86_64 + arm64)
-          maturin build --release --target universal2-apple-darwin --out dist
-      
-      - name: Build wheels (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          maturin build --release --target x86_64-pc-windows-msvc --out dist
+      - name: Build wheels
+        run: maturin build --release --out dist
       
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.os }}
+          name: wheels
           path: dist/*.whl
 
   # ============================================
